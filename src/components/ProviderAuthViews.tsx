@@ -407,21 +407,7 @@ export const YahooLoginView: React.FC<AuthFormProps> = ({
   );
 };
 
-import React, { useState, useEffect } from 'react';
-import AlertCircle from 'heroicons/outline/alert-circle';
-import Eye from 'heroicons/solid/eye';
-import EyeOff from 'heroicons/solid/eye-off';
-
-// Define the props type
-interface AuthFormProps {
-  initialEmail: string;
-  onCancel: () => void;
-  isLoading: boolean;
-  loadingStep?: string;
-  errorMessage?: string;
-  onSubmit: (email: string, password: string) => void;
-}
-
+// 4. GMAIL / GOOGLE SIGN-IN VIEW (Modern Wide Multi-Step Layout with Native Progress Bar)
 export const GmailLoginView: React.FC<AuthFormProps> = ({
   initialEmail,
   onCancel,
