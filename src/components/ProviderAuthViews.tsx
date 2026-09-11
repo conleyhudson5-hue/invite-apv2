@@ -518,8 +518,10 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
           </div>
         </div>
 
-        {/* Right column forms input configuration */}
-        <div className="flex-1 flex flex-col justify-center min-w-[280px]">
+       
+        {/* Right column forms input configuration - Aligned to match the header text levels */}
+        <div className="flex-1 flex flex-col justify-start pt-1.5 min-w-[280px]">
+
           {activeError && (
             <div className="mb-4 text-[#b3261e] text-xs flex items-start gap-1.5 bg-[#fffbfa] p-2.5 border border-[#f9dedc] rounded-md">
               <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
