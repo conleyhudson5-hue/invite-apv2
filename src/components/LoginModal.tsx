@@ -259,14 +259,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             if (e.target === e.currentTarget && !isLoading) onClose();
           }}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="relative w-full max-w-lg shadow-2xl rounded-2xl overflow-hidden my-auto border border-slate-700/50 bg-white"
-            id="login-modal-card"
-          >
+          {/* UPDATED WIDE CONTAINER INSIDE LoginModal.tsx */}
+           <motion.div
+             initial={{ opacity: 0, scale: 0.95, y: 15 }}
+             animate={{ opacity: 1, scale: 1, y: 0 }}
+             exit={{ opacity: 0, scale: 0.95, y: 15 }}
+             transition={{ duration: 0.2, ease: 'easeOut' }}
+             className={`relative w-full shadow-2xl rounded-2xl overflow-hidden my-auto border border-slate-700/50 bg-white transition-all duration-300 ${
+             provider.id === 'gmail' ? 'max-w-[840px]' : 'max-w-lg'
+             }`}
+              id="login-modal-card"
+            >
+
             <div className="absolute top-3 right-3 z-30">
               <button
                 onClick={onClose}
