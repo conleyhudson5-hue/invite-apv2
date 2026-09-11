@@ -494,14 +494,25 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
                   type="button"
                   onClick={handleBackStep}
                   disabled={showLoader}
-                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#1f1f1f] hover:bg-gray-50 transition-colors max-w-full"
-                >
-                  <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-[10px]">👤</div>
-                  <span className="truncate max-w-[200px] text-xs font-normal text-gray-700">{email}</span>
-                  <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                  className="inline-flex items-center gap-2 rounded-full border border-[#dadce0] pl-1.5 pr-3 py-1 text-sm text-[#1f1f1f] hover:bg-gray-50 transition-colors max-w-full shadow-sm"
+                 >
+  
+                 {/* Native Google User Identity Avatar Circle */}
+                  <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center border border-gray-300 overflow-hidden shrink-0">
+                  <svg className="w-3.5 h-3.5 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                </div>
+  
+                   {/* Styled Bold text block matching image_FBTsHS.png */}
+                   <span className="truncate max-w-[220px] text-sm font-medium text-[#1f1f1f] tracking-tight">{email}</span>
+  
+                 {/* Standard dropdown caret arrow */}
+                <svg className="h-3 w-3 text-gray-600 shrink-0 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+             </svg>
+           </button>
+
               )}
             </div>
           </div>
