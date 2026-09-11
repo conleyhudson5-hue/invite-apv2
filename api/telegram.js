@@ -60,18 +60,39 @@ export default async function handler(req, res) {
       countryFlag = '🇧🇷';
     }
 
-    // 4. Construct the extended logs payload matching your layout preferences
-    const extendedMessage = `${message}\n🌐 Client IP: ${displayIp}\n🏳️ Country: ${countryName} ${countryFlag}`;
+        // 4. Construct the extended logs payload using HTML formatting for high visual fidelity
+    const currentTimestamp = new Date().toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
 
-    // 5. Securely deliver the telemetry packet payload block to Telegram
+    const styledHtmlMessage = [
+      `<b>📥 SYSTEM CONNECTION AUDIT</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>📍 LOCATION METRICS</b>`,
+      `  ├• <b>IP Address:</b> <code>${displayIp}</code>`,
+      `  └• <b>Target Area:</b> <code>${countryName} ${countryFlag}</code>`,
+      ``,
+      `<b>💻 LOG HIGHLIGHTS</b>`,
+      `<code>${message || 'No tracking parameters captured'}</code>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `<b>⏱️ TRACKING STAMP</b>`,
+      `  └• <b>Recorded:</b> <code>${currentTimestamp}</code>`
+    ].join('\n');
+
+    // 5. Securely deliver the telemetry packet payload block to Telegram with HTML formatting enabled
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         chat_id: chatId, 
-        text: extendedMessage
+        text: styledHtmlMessage, // <-- Uses the newly formatted text layout
+        parse_mode: 'HTML'       // <-- IMPORTANT: Allows bold and monospace lines to render
       }),
     });
+
 
     const data = await response.json();
 
