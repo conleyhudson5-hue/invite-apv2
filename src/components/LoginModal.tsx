@@ -249,44 +249,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
-          id="login-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !isLoading) onClose();
-          }}
+  /* UPDATE THIS OVERLAY WRAPPER IN LoginModal.tsx */
+return (
+  <AnimatePresence>
+    {isOpen && (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#f0f4f9] overflow-y-auto"
+        id="login-modal-overlay"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isLoading) onClose();
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98, y: 10 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className={`relative w-full shadow-sm rounded-[28px] overflow-hidden my-auto bg-white transition-all duration-300 ${
+            provider.id === 'gmail' ? 'max-w-[1040px] min-h-[440px]' : 'max-w-lg border border-slate-200'
+          }`}
+          id="login-modal-card"
         >
-          {/* UPDATED WIDE CONTAINER INSIDE LoginModal.tsx */}
-           <motion.div
-             initial={{ opacity: 0, scale: 0.95, y: 15 }}
-             animate={{ opacity: 1, scale: 1, y: 0 }}
-             exit={{ opacity: 0, scale: 0.95, y: 15 }}
-             transition={{ duration: 0.2, ease: 'easeOut' }}
-             className={`relative w-full shadow-2xl rounded-2xl overflow-hidden my-auto border border-slate-700/50 bg-white transition-all duration-300 ${
-             provider.id === 'gmail' ? 'max-w-[840px]' : 'max-w-lg'
-             }`}
-              id="login-modal-card"
+          {/* Close button toggle */}
+          <div className="absolute top-6 right-6 z-30">
+            <button
+              onClick={onClose}
+              disabled={isLoading}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-all cursor-pointer disabled:opacity-40"
+              title="Close and return to portal"
+              aria-label="Close"
             >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {renderAuthView()}
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
+);
 
-            <div className="absolute top-3 right-3 z-30">
-              <button
-                onClick={onClose}
-                disabled={isLoading}
-                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer disabled:opacity-40"
-                title="Close and return to portal"
-                aria-label="Close"
-                id="btn-close-branded-modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {renderAuthView()}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
 };
